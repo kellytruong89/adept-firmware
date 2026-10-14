@@ -25,16 +25,10 @@ enum custom_keycodes {
     RCLK_SCRL = SAFE_RANGE, // tap = right click, hold = scroll
     MCLK_ZOOM,              // tap = middle click, hold = zoom
     DPI_HAND,               // tap = DPI cycle, hold 1 sec = switch hands
+    BACK_FWD,               // tap = Back, double tap = Forward
 };
 
-// Double-tap setup: Back once, Forward twice
-enum { TD_BACK };
-tap_dance_action_t tap_dance_actions[] = {
-    [TD_BACK] = ACTION_TAP_DANCE_DOUBLE(MS_BTN4, MS_BTN5),
-};
-
-#define BACK_FWD TD(TD_BACK)
-#define APP_SW   C(A(KC_TAB))
+#define APP_SW C(A(KC_TAB))
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // Right-hand mode
@@ -49,9 +43,23 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 static uint16_t rclk_timer, mclk_timer, dpi_timer;
 static bool     mclk_held = false, zoom_active = false;
 static bool     dpi_held = false, hand_swapped = false;
+static uint16_t back_timer;
+static bool     back_pending = false;
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     switch (keycode) {
+        case BACK_FWD:
+            if (record->event.pressed) {
+                if (back_pending && timer_elapsed(back_timer) < HOLD_TIME) {
+                    back_pending = false;
+                    tap_code16(MS_BTN5); // second tap in time = Forward
+                } else {
+                    back_pending = true; // wait to see if a second tap comes
+                    back_timer   = timer_read();
+                }
+            }
+            return false;
+
         case RCLK_SCRL:
             if (record->event.pressed) {
                 rclk_timer     = timer_read();
@@ -98,6 +106,11 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 // Runs constantly in the background to detect long holds
 void housekeeping_task_user(void) {
+    // Back button: no second tap came in time, so send Back
+    if (back_pending && timer_elapsed(back_timer) >= HOLD_TIME) {
+        back_pending = false;
+        tap_code16(MS_BTN4);
+    }
     // Middle button held long enough: zoom = Ctrl + ball scroll
     if (mclk_held && !zoom_active && timer_elapsed(mclk_timer) >= HOLD_TIME) {
         zoom_active = true;
