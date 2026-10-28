@@ -38,8 +38,8 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 };
 
 #define HOLD_TIME      200  // ms: shorter than this counts as a tap
-#define SCROLL_SLOWDOWN 4.0f  // bigger number = slower scroll
-#define ZOOM_SLOWDOWN   12.0f // bigger number = slower zoom
+#define SCROLL_SLOWDOWN 6.0f  // bigger number = slower scroll
+#define ZOOM_SLOWDOWN   18.0f // bigger number = slower zoom
 #define HAND_SWAP_TIME 1000 // ms: hold DPI button this long to switch hands
 
 static uint16_t rclk_timer, mclk_timer, dpi_timer;
