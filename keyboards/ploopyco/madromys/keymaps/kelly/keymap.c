@@ -55,6 +55,8 @@ static bool     back_pending = false;
 static uint16_t app_timer;
 static bool     app_held = false, pan_active = false;
 static bool     shift_scroll = false; // Shift is held for sideways scrolling
+static uint8_t  scroll_axis = 0;      // 0 = not decided yet, 1 = up/down, 2 = sideways
+static int      scroll_probe_x = 0, scroll_probe_y = 0;
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     switch (keycode) {
@@ -191,26 +193,35 @@ report_mouse_t pointing_device_task_user(report_mouse_t report) {
         scroll_acc_x -= report.x;
         scroll_acc_y -= report.y;
 
-        // Sideways: hold Shift and scroll up/down instead (works in Explorer, Excel, Chrome)
-        if (!zoom_active && (report.x != 0 || report.y != 0)) {
-            int ax = report.x < 0 ? -report.x : report.x;
-            int ay = report.y < 0 ? -report.y : report.y;
-            bool sideways = ax > ay;
-            if (sideways && !shift_scroll) {
-                shift_scroll = true;
-                register_code(KC_LSFT);
-            } else if (!sideways && shift_scroll) {
-                shift_scroll = false;
-                unregister_code(KC_LSFT);
+        // Sideways: hold Shift and scroll up/down instead (works in Explorer, Excel, Chrome).
+        // Each scroll picks ONE direction from the first bit of movement and keeps it
+        // until you let go, so Shift is pressed at most once per scroll.
+        if (!zoom_active) {
+            if (scroll_axis == 0) {
+                scroll_probe_x += report.x < 0 ? -report.x : report.x;
+                scroll_probe_y += report.y < 0 ? -report.y : report.y;
+                if (scroll_probe_x + scroll_probe_y >= 2) {
+                    scroll_axis = (scroll_probe_x > scroll_probe_y) ? 2 : 1;
+                    if (scroll_axis == 2) {
+                        shift_scroll = true;
+                        register_code(KC_LSFT);
+                    }
+                }
             }
-        }
-        if (shift_scroll) {
-            report.y = report.x; // to flip sideways direction, change to: report.y = -report.x;
+            if (scroll_axis == 2) {
+                report.y = report.x; // to flip sideways direction, change to: report.y = -report.x;
+            }
+            if (scroll_axis == 0) {
+                report.y = 0; // still deciding: send nothing yet
+            }
         }
         report.x = 0; // no true sideways scroll is sent
     } else {
         scroll_acc_x = 0;
         scroll_acc_y = 0;
+        scroll_axis = 0;
+        scroll_probe_x = 0;
+        scroll_probe_y = 0;
         if (shift_scroll) {
             shift_scroll = false;
             unregister_code(KC_LSFT);
